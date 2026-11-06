@@ -1,6 +1,11 @@
 /target/
 /results*.jsonl
 __pycache__/
+*.egg-info/
+/build/
+/dist/
+
+.idea
 
 # Generated reports and private research belong outside the published guides.
 /evidence/

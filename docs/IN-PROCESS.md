@@ -67,7 +67,8 @@ This builds the command-line engine and `globalsim.dll` on Windows,
 `libglobalsim.so` on Linux, or `libglobalsim.dylib` on macOS. The current performance
 and library regression measurements were run on Windows.
 
-The [Python binding](../tools/native_engine.py) uses the standard-library `ctypes`
+The [Python API](PYTHON-DOCUMENTATION.md) is installable with `python -m pip install .`.
+The legacy [Python binding](../tools/native_engine.py) uses the standard-library `ctypes`
 module. Add `GlobalSim/tools` to your application's module path:
 
 ```python

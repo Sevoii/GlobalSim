@@ -81,8 +81,8 @@ The worker accepts one race specification per line of JSON and returns one
 result per race. A `seeds` array runs one setup across multiple seeds; `threads`
 controls concurrency and `omitFrames` selects results-only output.
 
-The [prepared Rust and C API](docs/IN-PROCESS.md) reuses race setup and exposes
-numeric replay frames directly. A Python binding and a
+The [prepared Rust API](docs/IN-PROCESS.md) and [C API](docs/C-API-DOCUMENTATION.md) reuse race setup and expose
+numeric replay frames directly. An installable [Python binding](docs/PYTHON-DOCUMENTATION.md) and a
 [lossless binary worker interface](docs/BINARY-REPLAY.md) support analysis tools.
 See the [input/output reference](docs/INTERFACE.md) for request fields and errors.
 

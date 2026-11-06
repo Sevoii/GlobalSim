@@ -1691,3 +1691,5 @@ mod output_cache_tests {
         assert!(Rc::ptr_eq(&first, &bundled_geometry(10504, distance).unwrap()));
     }
 }
+#[cfg(feature = "python")]
+mod python;
