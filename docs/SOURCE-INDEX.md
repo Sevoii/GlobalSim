@@ -73,6 +73,7 @@ for execution order, [mathematics](MATHEMATICS.md) for equations and
 | [check_accuracy_regressions.py](../tools/check_accuracy_regressions.py) | Strict official-fixture comparison. |
 | [check_binary_accuracy.py](../tools/check_binary_accuracy.py) | Binary replay observation checking. |
 | [audit_validation_coverage.py](../tools/audit_validation_coverage.py) | Fixture observation and branch coverage inventory. |
+| [check_skill_enum.py](../tools/check_skill_enum.py) | Checks which `SkillType` values occur in the legacy skill data. |
 | [validation_inputs.py](../tools/validation_inputs.py) | Captured input preflight and integrity checks. |
 | [validation_contract.py](../tools/validation_contract.py) | Input-aware output structure and consistency checks. |
 | [validation_runner.py](../tools/validation_runner.py) | Bounded engine execution and recovery. |

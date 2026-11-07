@@ -1,5 +1,8 @@
 # GlobalSim Python API
 
+See [UmaBuilder and enums](BUILDER.md) for constructing runners with named
+characters, skills, strategies, and aptitudes.
+
 ## Typed request and frame helpers
 
 `RaceRequest` and `Runner` model the required request fields, with Python-style
