@@ -102,6 +102,49 @@ class UmaBuilderTests(unittest.TestCase):
                 self.assertEqual(b.strategy(strategy.value).build().strategy, strategy.value)
 
 
+
+class InheritTests(unittest.TestCase):
+    def test_unique_or_inherited_member_adds_inherited_at_level_1(self):
+        for given in (Skill.AD_ASTRA_101051, Skill.AD_ASTRA_901051):
+            with self.subTest(given=given.name):
+                skills = builder().inherit(given).build().extra['skills']
+                self.assertEqual(skills, [{'skillId': '901051', 'level': 1, 'isUnique': False}])
+        self.assertEqual(builder().inherit(Skill.ABOVE_THE_CLOUDLINE).build().extra['skills'][0]['skillId'],
+                         '901302211')
+
+    def test_rejects_non_uniques_and_non_members(self):
+        for bad in (Skill.CORNER_ADEPT_CIRCLE, Skill.UNQUENCHED_THIRST):
+            with self.subTest(skill=bad.name), self.assertRaisesRegex(ValueError, 'no inherited version'):
+                builder().inherit(bad)
+        for bad in (100011, '100011', None):
+            with self.subTest(skill=bad), self.assertRaises(TypeError):
+                builder().inherit(bad)
+
+    def test_cannot_inherit_own_unique(self):
+        b = builder().skill(Skill.SHOOTING_STAR_100011, level=3, unique=True)
+        for given in (Skill.SHOOTING_STAR_100011, Skill.SHOOTING_STAR_900011):
+            with self.subTest(given=given.name), self.assertRaisesRegex(ValueError, 'own unique'):
+                b.inherit(given)
+        # The same skill added without the unique flag isn't the runner's own unique.
+        builder().skill(Skill.SHOOTING_STAR_100011).inherit(Skill.SHOOTING_STAR_100011)
+
+    def test_inheriting_twice_keeps_one_entry_and_overrides_level(self):
+        b = builder().skill(Skill.AD_ASTRA_901051, level=4).inherit(Skill.AD_ASTRA_101051)
+        self.assertEqual(b.build().extra['skills'], [{'skillId': '901051', 'level': 1, 'isUnique': False}])
+
+    def test_str_marks_inherited_skills(self):
+        text = str(builder().skill(Skill.AD_ASTRA_101051, level=2, unique=True)
+                   .inherit(Skill.SHOOTING_STAR_100011).inherit(Skill.ABOVE_THE_CLOUDLINE))
+        self.assertIn('    Ad Astra                         #101051     Lv2  unique', text)
+        self.assertIn('    Shooting Star (inherited)        #900011     Lv1', text)
+        self.assertIn('    Above the Cloudline (inherited)  #901302211  Lv1', text)
+        self.assertNotIn('(inherited) (inherited)', text)
+
+    def test_round_trips_through_json(self):
+        b = builder().inherit(Skill.AD_ASTRA_101051)
+        self.assertEqual(UmaBuilder.from_json(b.to_json()).build(), b.build())
+
+
 def runner_json(**changes):
     """A minimal valid runner dictionary; pass key=None to remove a field."""
     value = dict(speed=1200, stamina=900, power=1000, guts=400, wisdom=600,

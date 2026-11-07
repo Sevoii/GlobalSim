@@ -33,6 +33,13 @@ _APTITUDES = (('distance_aptitude', 'Distance'), ('surface_aptitude', 'Surface')
               ('strategy_aptitude', 'Strategy'))
 
 
+def _display_name(skill: Skill) -> str:
+    # 141 inherited skills share their unique's label (e.g. both are "Ad Astra").
+    if skill.is_inherited and '(inherited)' not in skill.label:
+        return f'{skill.label} (inherited)'
+    return skill.label
+
+
 def _number(value):
     return str(value) if isinstance(value, int) else f'{value:g}'
 
@@ -114,7 +121,7 @@ class UmaBuilder:
             f'{label} {self._aptitudes[key]}' for key, label in _APTITUDES))
         if self._skills:
             row('Skills', len(self._skills))
-            names = {key: Skill(key).label for key in self._skills}
+            names = {key: _display_name(Skill(key)) for key in self._skills}
             width = max(map(len, names.values()))
             for key, entry in self._skills.items():
                 unique = '  unique' if entry['isUnique'] else ''
@@ -152,6 +159,22 @@ class UmaBuilder:
             raise TypeError('unique must be a boolean')
         self._skills[int(skill)] = dict(skillId=str(int(skill)), level=level, isUnique=unique)
         return self
+
+    def inherit(self, skill: Skill):
+        """Add a parent's unique skill in its inherited form.
+
+        Pass the parent's unique (e.g. Skill.SHOOTING_STAR_100011) or the inherited
+        member itself. Inherited uniques don't level up, so the skill is added at
+        level 1 and not marked unique.
+        """
+        if not isinstance(skill, Skill):
+            raise TypeError('skill must be a Skill enum member')
+        inherited = skill if skill.is_inherited else skill.inherited
+        own = self._skills.get(int(inherited.unique))
+        if own is not None and own['isUnique']:
+            raise ValueError(f'{inherited.unique.label} is this runner\'s own unique; '
+                             'it cannot also be inherited')
+        return self.skill(inherited)
 
     def mood(self, mood: int):
         if type(mood) is not int or not -2 <= mood <= 2:
