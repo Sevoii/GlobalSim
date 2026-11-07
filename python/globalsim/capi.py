@@ -2,6 +2,7 @@
 import ctypes
 from pathlib import Path
 import threading
+from . import _native
 
 
 class CGlobalSim:
@@ -9,7 +10,6 @@ class CGlobalSim:
     def __init__(self, library=None):
         """Load ``library``, or the Maturin-installed extension when omitted."""
         if library is None:
-            from . import _native
             library = _native.__file__
         self._lib = ctypes.CDLL(str(Path(library).resolve()))
         signatures = {

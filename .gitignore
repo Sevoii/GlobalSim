@@ -15,3 +15,7 @@ __pycache__/
 /docs/archive/
 /docs/*-20??????.md
 /docs/V*-VALIDATION.md
+
+# Compiled extension built by maturin develop
+python/globalsim/_native.*
+!python/globalsim/_native.pyi

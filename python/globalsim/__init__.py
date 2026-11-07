@@ -1,4 +1,12 @@
 """GlobalSim prepared race and binary replay API."""
+try:
+    from . import _native
+except ImportError as error:
+    raise ImportError(
+        "globalsim's Rust extension (globalsim._native) could not be loaded. "
+        "In a source checkout, build it with `maturin develop --release`; "
+        "otherwise install a globalsim wheel for this platform."
+    ) from error
 from .native_engine import NativeRace
 from .capi import CGlobalSim, CHandle
 from .prepared import PreparedRace

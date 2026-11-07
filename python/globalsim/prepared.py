@@ -3,12 +3,12 @@ import json
 import threading
 from .replay_protocol import decode
 from .models import RaceRequest
+from ._native import PreparedRace as RustRace
 
 
 class PreparedRace:
     """Prepare a request once and simulate independent seeds on its owner thread."""
     def __init__(self, spec):
-        from ._native import PreparedRace as RustRace
         self._thread = threading.current_thread()
         self._race = RustRace(self._json(spec))
 
