@@ -8,6 +8,7 @@ import json
 import math
 import struct
 from typing import BinaryIO
+from .models import RaceFrame, RunnerFrame
 
 HEADER = struct.Struct('<8sQIIQ')
 MAGIC = b'GSIMRP01'
@@ -59,6 +60,12 @@ class Replay:
         values = struct.unpack_from('<' + 'd' * (1 + 6 * self.horse_count),
                                     self.frames, index * self.stride)
         return values[0], values[1:]
+
+    def typed_frame(self, index: int) -> RaceFrame:
+        """Decode one frame into named values, retaining nonfinite floats."""
+        time, values = self.frame(index)
+        return RaceFrame(time, tuple(RunnerFrame(*values[i:i + 6])
+                                    for i in range(0, len(values), 6)))
 
     def to_json_value(self) -> dict:
         """Materialize the conventional reply shape when an application needs it.

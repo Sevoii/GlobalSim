@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import unittest
 
-from globalsim import CGlobalSim, CHandle, FIELDS, NativeRace, PreparedRace, decode, read_reply, read_wire
+from globalsim import CGlobalSim, CHandle, FIELDS, NativeRace, PreparedRace, RaceRequest, decode, read_reply, read_wire
 from globalsim import _native
 
 
@@ -28,6 +28,21 @@ class PreparedRaceTests(unittest.TestCase):
                 for seed in (100003, 107922, 100003):
                     with self.subTest(dense=dense, seed=seed):
                         self.assertEqual(python.run_wire(seed), c.run_wire(seed))
+
+    def test_typed_request_roundtrip_and_frames(self):
+        request = RaceRequest.from_dict(self.spec)
+        self.assertEqual(request.to_dict(), self.spec)
+        for factory in (lambda: PreparedRace(request), lambda: NativeRace(spec=request)):
+            with factory() as race:
+                replay = race.run(100003)
+                self.assertEqual(race.run_wire(100003), self.reference)
+                frame = replay.typed_frame(0)
+                time, values = replay.frame(0)
+                self.assertEqual(frame.time, time)
+                self.assertEqual(frame.horses[0].position, values[0])
+                self.assertEqual(frame.horses[0].block_front_horse_index, values[5])
+                with self.assertRaises(IndexError):
+                    replay.typed_frame(replay.count)
 
     def test_direct_c_api_status_packet_and_recovery(self):
         # Omitting a library uses the extension bundled in the installed wheel.

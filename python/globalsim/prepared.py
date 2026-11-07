@@ -2,6 +2,7 @@
 import json
 import threading
 from .replay_protocol import decode
+from .models import RaceRequest
 
 
 class PreparedRace:
@@ -13,6 +14,8 @@ class PreparedRace:
 
     @staticmethod
     def _json(spec):
+        if isinstance(spec, RaceRequest):
+            spec = spec.to_dict()
         if isinstance(spec, bytes):
             return spec.decode('utf-8')
         return spec if isinstance(spec, str) else json.dumps(spec, separators=(',', ':'))

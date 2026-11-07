@@ -3,6 +3,7 @@ import json
 import threading
 from .capi import CGlobalSim
 from .replay_protocol import decode
+from .models import RaceRequest
 
 
 class NativeRace:
@@ -35,6 +36,8 @@ class NativeRace:
 
     def prepare(self, spec):
         self._check()
+        if isinstance(spec, RaceRequest):
+            spec = spec.to_dict()
         wire = spec if isinstance(spec, (str, bytes)) else json.dumps(spec, separators=(',', ':')).encode('utf-8')
         self._success(self._handle.prepare(wire))
 

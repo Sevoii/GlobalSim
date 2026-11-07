@@ -1,5 +1,35 @@
 # GlobalSim Python API
 
+## Typed request and frame helpers
+
+`RaceRequest` and `Runner` model the required request fields, with Python-style
+names. `RaceRequest.from_dict(spec)` reads an existing request, preserving all
+optional and future fields in each object's `extra` dictionary; `to_dict()`
+recreates the JSON-ready shape. Pass a `RaceRequest` directly to `PreparedRace`
+or `NativeRace`. These helpers do not replace engine validation.
+
+```python
+from globalsim import RaceRequest, NativeRace
+
+request = RaceRequest.from_dict(spec)  # spec is a conventional request dict
+request.horses[0].speed += 10
+with NativeRace(spec=request) as race:
+    replay = race.run(request.seed)
+    if replay.count:
+        frame = replay.typed_frame(0)
+        print(frame.time, frame.horses[0].position, frame.horses[0].hp)
+```
+
+`typed_frame(index)` returns a frozen `RaceFrame` with a tuple of frozen
+`RunnerFrame` values. It decodes only the requested frame and preserves nonfinite
+floats. Existing `frame()`, `frames`, and `to_json_value()` remain available;
+use the buffer for bulk numeric processing.
+
+`RunnerFrame.position` corresponds to the wire field `pos`, and
+`temptation_mode` corresponds to `temptationMode`. The
+`block_front_horse_index` value remains a float, as on the wire; `-1.0` means
+there is no runner ahead.
+
 ## Testing the bindings
 
 Install the package into your virtual environment with `python -m pip install .`
