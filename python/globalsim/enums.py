@@ -1481,6 +1481,7 @@ class Uma(IntEnum):
     BIWA_HAYAHIDE = 1023  # Biwa Hayahide
     COPANO_RICKEY = 1098  # Copano Rickey
     CURREN_CHAN = 1038  # Curren Chan
+    DAITAKU_HELIOS = 1065  # Daitaku Helios
     DAIWA_SCARLET = 1009  # Daiwa Scarlet
     EISHIN_FLASH = 1037  # Eishin Flash
     EL_CONDOR_PASA = 1014  # El Condor Pasa
@@ -3043,6 +3044,7 @@ _UMA_LABELS = {
     1061: 'King Halo',
     1062: 'Matikanetannhauser',
     1064: 'Mejiro Palmer',
+    1065: 'Daitaku Helios',
     1067: 'Satono Diamond',
     1068: 'Kitasan Black',
     1069: 'Sakura Chiyono O',
