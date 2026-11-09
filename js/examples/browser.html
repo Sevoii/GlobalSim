@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GlobalSim browser example</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 48rem; padding: 0 1rem; }
+    pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>GlobalSim in the browser</h1>
+  <p>Serve the <code>js</code> folder over HTTP (for example <code>python -m http.server</code> from
+    <code>js/</code>) after <code>npm run build</code>, then open <code>/examples/browser.html</code>.</p>
+  <pre id="out">Running...</pre>
+  <script type="module">
+    import {
+      Aptitude, ChampionsMeeting, PreparedRace, RaceBuilder, RacePool, Skill, Strategy, Uma, UmaBuilder,
+    } from '../dist/index.js';
+
+    const out = document.getElementById('out');
+    const log = (text) => { out.textContent += `\n${text}`; };
+    try {
+      out.textContent = '';
+      const runner = (uma, strategy) => new UmaBuilder(uma)
+        .stats({ speed: 1200, stamina: 900, power: 1000, guts: 400, wisdom: 600 })
+        .strategy(strategy)
+        .aptitudes({ distance: Aptitude.A, surface: Aptitude.A, strategy: Aptitude.A })
+        .skill(Skill.PROFESSOR_OF_CURVATURE);
+      const builder = RaceBuilder.championsMeeting(ChampionsMeeting.TAURUS_CUP).seed(1)
+        .runner(runner(Uma.SPECIAL_WEEK, Strategy.LATE_SURGER))
+        .runner(runner(Uma.OGURI_CAP, Strategy.PACE_CHASER))
+        .runner(runner(Uma.SILENCE_SUZUKA, Strategy.FRONT_RUNNER));
+      log(String(builder));
+      const request = builder.build();
+
+      // One seed on the page's thread.
+      const race = await PreparedRace.create(request);
+      const replay = race.run(1);
+      log(`\nSeed 1: ${replay.count} frames; finish times ${replay.metadata.results.map((r) => r.finishTimeRaw.toFixed(3)).join(', ')}`);
+
+      // Many seeds across Web Workers.
+      const pool = await RacePool.create();
+      const seeds = Array.from({ length: 1000 }, (_, i) => i + 1);
+      const start = performance.now();
+      const results = await pool.runResults(request, seeds);
+      const wins = request.horses.map(() => 0);
+      for (const result of results) wins[result.results.findIndex((r) => r.finishOrder === 0)]++;
+      log(`\n${seeds.length} seeds on ${pool.size} workers in ${(performance.now() - start).toFixed(0)} ms`);
+      log(`Wins: ${wins.join(' / ')}`);
+      log(`Pool matches page thread: ${JSON.stringify(results[0]) === JSON.stringify(race.runResults(1))}`);
+      pool.close();
+      race.close();
+      document.title = 'done';
+    } catch (error) {
+      log(`Error: ${error?.stack ?? error}`);
+      document.title = 'failed';
+    }
+  </script>
+</body>
+</html>

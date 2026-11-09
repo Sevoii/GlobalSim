@@ -83,7 +83,9 @@ controls concurrency and `omitFrames` selects results-only output.
 
 The [prepared Rust API](docs/IN-PROCESS.md) and [C API](docs/C-API-DOCUMENTATION.md) reuse race setup and expose
 numeric replay frames directly. An installable [Python binding](docs/PYTHON-DOCUMENTATION.md) and a
-[lossless binary worker interface](docs/BINARY-REPLAY.md) support analysis tools.
+[lossless binary worker interface](docs/BINARY-REPLAY.md) support analysis tools. A
+[WebAssembly binding](docs/WASM.md) and [JavaScript package](docs/JAVASCRIPT.md) run the
+engine in browsers and Node.
 See the [input/output reference](docs/INTERFACE.md) for request fields and errors.
 
 ## Documentation

@@ -1,0 +1,27 @@
+{
+  "name": "globalsim",
+  "version": "0.1.0",
+  "description": "GlobalSim race simulation engine for browsers and Node (WebAssembly)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": "./dist/node.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": ["./dist/node.js", "./dist/worker.js", "./dist/node-worker.js"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:ts": "node build.mjs --skip-wasm",
+    "catalog": "python ../tools/generate_js_catalog.py",
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.6.3"
+  }
+}

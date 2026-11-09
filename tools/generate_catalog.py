@@ -1,7 +1,8 @@
 """Generate readable enums from an uma-tools Global snapshot.
 
 Writes python/globalsim/enums.py (skills, characters) and python/globalsim/courses.py
-(tracks, the engine's course table, Champions Meeting presets). Course geometry IDs
+(tracks, the engine's course table, Champions Meeting presets), then js/src/catalog.ts
+from those modules (generate_js_catalog.py). Course geometry IDs
 come from the engine's own data/course_data.json; names and presets from uma-tools.
 
 By default the latest upstream commit is used and recorded in CATALOG-SOURCES.md;
@@ -13,6 +14,8 @@ from pathlib import Path
 import re
 import unicodedata
 import urllib.request
+
+import generate_js_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / 'python/globalsim'
@@ -211,6 +214,7 @@ def main():
         "`Skill.in_bundled_table` and the course table come from GlobalSim's "
         '`data/skill_data.json` and `data/course_data.json`; tracks without an upstream '
         'name are named by ID.\n', encoding='utf-8')
+    generate_js_catalog.write()
     print(f'Generated {len(skills)} skills, {len(umas)} characters, '
           f'{len(engine_courses())} courses, and {len(global_presets(app))} presets at {commit}')
 

@@ -1,0 +1,204 @@
+/** Run seeds in parallel across Web Workers (or Node worker threads), each with its own engine. */
+import { compiledModule, loadCourseGeometry, needsGeometry, normalize, type RequestInput } from './engine.js';
+import type { RaceResult } from './models.js';
+import { decode, type Replay } from './replay.js';
+import type { WorkerReply, WorkerRequest } from './worker-core.js';
+
+/** The pool's view of one worker; supply `spawn` to use a custom worker setup. */
+export interface PoolWorker {
+  post(message: WorkerRequest): void;
+  onMessage(listener: (message: WorkerReply) => void): void;
+  onError(listener: (error: Error) => void): void;
+  terminate(): void;
+}
+
+export interface PoolOptions {
+  /** Worker count; defaults to the number of logical cores. */
+  size?: number;
+  /** Seeds per worker message; defaults to an even split, at most 64. */
+  chunkSize?: number;
+  spawn?: () => PoolWorker;
+}
+
+export interface RunOptions {
+  /** Called after each chunk with the number of seeds finished. */
+  onProgress?: (done: number, total: number) => void;
+  /** Stops handing out chunks; the returned promise rejects with the signal's reason. */
+  signal?: AbortSignal;
+}
+
+let defaultSpawn = (): PoolWorker => {
+  // Written out literally so bundlers (Vite, webpack) find and bundle the worker.
+  const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  return {
+    post: (message) => worker.postMessage(message),
+    onMessage: (listener) => worker.addEventListener('message', (event) => listener(event.data as WorkerReply)),
+    onError: (listener) => worker.addEventListener('error', (event) => {
+      event.preventDefault();
+      listener(event.error instanceof Error ? event.error : new Error(event.message || 'GlobalSim worker failed'));
+    }),
+    terminate: () => worker.terminate(),
+  };
+};
+
+/** @internal */
+export function setDefaultSpawn(spawn: () => PoolWorker): void { defaultSpawn = spawn; }
+
+interface Slot {
+  worker: PoolWorker;
+  ready: Promise<void>;
+  /** Request JSON this worker has prepared. */
+  key: string | undefined;
+  geometry: Set<number>;
+  pending: { resolve: (reply: WorkerReply & { type: 'done' }) => void; reject: (error: Error & { fatal?: boolean }) => void } | undefined;
+  dead: boolean;
+}
+
+function failure(message: string, fatal: boolean) {
+  return Object.assign(new Error(message), { fatal });
+}
+
+export class RacePool {
+  #module: WebAssembly.Module;
+  #spawn: () => PoolWorker;
+  #chunkSize: number | undefined;
+  #slots: Slot[];
+  #queue: Promise<unknown> = Promise.resolve();
+  #closed = false;
+
+  private constructor(module: WebAssembly.Module, size: number, options: PoolOptions) {
+    this.#module = module;
+    this.#spawn = options.spawn ?? defaultSpawn;
+    this.#chunkSize = options.chunkSize;
+    this.#slots = Array.from({ length: size }, () => this.#spawnSlot());
+  }
+
+  /** Load the engine once, then start the workers. */
+  static async create(options: PoolOptions = {}): Promise<RacePool> {
+    const size = options.size ?? Math.max(1, globalThis.navigator?.hardwareConcurrency ?? 4);
+    if (!Number.isInteger(size) || size < 1) throw new RangeError('size must be a positive integer');
+    if (options.chunkSize !== undefined && !(Number.isInteger(options.chunkSize) && options.chunkSize > 0)) {
+      throw new RangeError('chunkSize must be a positive integer');
+    }
+    const pool = new RacePool(await compiledModule(), size, options);
+    try {
+      await Promise.all(pool.#slots.map((slot) => slot.ready));
+    } catch (error) {
+      pool.close();
+      throw error;
+    }
+    return pool;
+  }
+
+  get size(): number { return this.#slots.length; }
+
+  #spawnSlot(): Slot {
+    const worker = this.#spawn();
+    let markReady!: () => void;
+    let markFailed!: (error: Error) => void;
+    const slot: Slot = {
+      worker, key: undefined, geometry: new Set(), pending: undefined, dead: false,
+      ready: new Promise((resolve, reject) => { markReady = resolve; markFailed = reject; }),
+    };
+    slot.ready.catch(() => {});
+    worker.onMessage((reply) => {
+      if (reply.type === 'ready') return markReady();
+      if (reply.type === 'initError') return markFailed(new Error(reply.message));
+      const pending = slot.pending;
+      slot.pending = undefined;
+      if (reply.type === 'done') pending?.resolve(reply);
+      else pending?.reject(failure(reply.message, reply.fatal));
+    });
+    worker.onError((error) => {
+      slot.dead = true;
+      markFailed(error);
+      slot.pending?.reject(failure(error.message, true));
+      slot.pending = undefined;
+    });
+    worker.post({ type: 'init', module: this.#module });
+    return slot;
+  }
+
+  /** Results without frames for every seed, in seed order. */
+  runResults(request: RequestInput, seeds: readonly number[], options: RunOptions = {}): Promise<RaceResult[]> {
+    return this.#enqueue(request, seeds, 'results', options) as Promise<RaceResult[]>;
+  }
+
+  /** Decoded replays for every seed, in seed order. */
+  async run(request: RequestInput, seeds: readonly number[], options: RunOptions = {}): Promise<Replay[]> {
+    const packets = await this.#enqueue(request, seeds, 'replay', options) as Uint8Array[];
+    return packets.map(decode);
+  }
+
+  /** Stop every worker. Pending runs reject. */
+  close(): void {
+    this.#closed = true;
+    for (const slot of this.#slots) {
+      slot.pending?.reject(failure('Race pool was closed', false));
+      slot.pending = undefined;
+      slot.worker.terminate();
+    }
+  }
+
+  // One batch at a time, so each worker's prepared request stays coherent.
+  #enqueue(request: RequestInput, seeds: readonly number[], mode: 'results' | 'replay', options: RunOptions) {
+    const task = this.#queue.then(() => this.#execute(request, seeds, mode, options));
+    this.#queue = task.catch(() => {});
+    return task;
+  }
+
+  async #execute(input: RequestInput, seeds: readonly number[], mode: 'results' | 'replay', options: RunOptions) {
+    if (this.#closed) throw new Error('Race pool was closed');
+    if (!Array.isArray(seeds) || !seeds.every(Number.isSafeInteger)) {
+      throw new RangeError('seeds must be an array of safe integers');
+    }
+    const { json, request } = normalize(input);
+    const courseId = request.courseId;
+    const geometry = needsGeometry(request) ? await loadCourseGeometry(courseId) : undefined;
+    const total = seeds.length;
+    const out: unknown[] = new Array(total);
+    const chunk = this.#chunkSize ?? Math.max(1, Math.min(64, Math.ceil(total / (this.#slots.length * 4))));
+    let next = 0;
+    let done = 0;
+    let error: unknown;
+
+    const work = async (index: number) => {
+      while (error === undefined && next < total && !this.#closed) {
+        try {
+          options.signal?.throwIfAborted();
+          let slot = this.#slots[index]!;
+          if (slot.dead) slot = this.#slots[index] = this.#spawnSlot();
+          await slot.ready;
+          const start = next;
+          next = Math.min(total, next + chunk);
+          const message: WorkerRequest = { type: 'run', mode, seeds: seeds.slice(start, next) };
+          if (geometry !== undefined && !slot.geometry.has(courseId)) message.geometry = [courseId, geometry];
+          if (slot.key !== json) message.request = json;
+          const reply = await new Promise<WorkerReply & { type: 'done' }>((resolve, reject) => {
+            slot.pending = { resolve, reject };
+            slot.worker.post(message);
+          }).catch((reason: Error & { fatal?: boolean }) => {
+            slot.key = undefined;
+            if (reason.fatal) {
+              slot.dead = true;
+              slot.worker.terminate();
+            }
+            throw reason;
+          });
+          slot.key = json;
+          if (geometry !== undefined) slot.geometry.add(courseId);
+          reply.results.forEach((result, i) => { out[start + i] = result; });
+          done += reply.results.length;
+          options.onProgress?.(done, total);
+        } catch (reason) {
+          error ??= reason;
+        }
+      }
+    };
+
+    await Promise.all(this.#slots.map((_, index) => work(index)));
+    if (error !== undefined) throw error;
+    if (this.#closed) throw new Error('Race pool was closed');
+    return out;
+  }
+}

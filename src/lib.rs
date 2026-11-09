@@ -56,7 +56,7 @@ use json::{Value, ReplayFrame};
 use race_field::RaceField;
 use race_solver_builder::{HorseSpec, RaceSolverBuilder, SkillAlternative, SkillDef, SkillEffectDef, SkillTable};
 
-#[cfg(feature = "fast-alloc")]
+#[cfg(all(feature = "fast-alloc", not(target_family = "wasm")))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
@@ -1693,3 +1693,5 @@ mod output_cache_tests {
 }
 #[cfg(feature = "python")]
 mod python;
+#[cfg(all(feature = "wasm", target_family = "wasm"))]
+mod wasm;

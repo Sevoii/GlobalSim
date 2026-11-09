@@ -23,9 +23,13 @@ panic = "abort"
 
 [features]
 python = ["dep:pyo3"]
+# JavaScript bindings (src/wasm.rs) for wasm32-unknown-unknown. Pair with
+# external-geometry to keep the module small; see docs/WASM.md.
+wasm = ["dep:wasm-bindgen"]
 default = ["fast-alloc"]
 # mimalloc as the global allocator: lower latency (needs a C compiler). Build
-# with --no-default-features to use the platform allocator instead.
+# with --no-default-features to use the platform allocator instead. Ignored on
+# wasm targets, which always use the platform allocator.
 fast-alloc = ["dep:mimalloc"]
 # Leave the captured course geometry assets (data/course_geometry, most of the
 # binary's size) out of the build; hosts register a course's geometry at
@@ -47,4 +51,7 @@ experimental-pacing-log = []
 
 [dependencies]
 pyo3 = { version = "0.23", optional = true, features = ["extension-module", "abi3-py39"] }
+wasm-bindgen = { version = "0.2.130", optional = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 mimalloc = { version = "0.1.52", optional = true, default-features = false }
